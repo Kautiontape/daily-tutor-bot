@@ -1,11 +1,19 @@
+import logging
 import os
 
-from openai import OpenAI
+from openai import APIConnectionError, APIError, OpenAI, RateLimitError
 
 from src.models import QuestionGeneration, SolutionResponse
 
+logger = logging.getLogger(__name__)
+
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-MODEL_NAME = "gpt-5"  # Using GPT-5 (released in 2025)
+# Primary model - GPT-4o is widely available and capable
+PRIMARY_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
+# Fallback model - GPT-4o-mini is faster and cheaper
+FALLBACK_MODEL = os.getenv("OPENAI_FALLBACK_MODEL", "gpt-4o-mini")
+# Legacy MODEL_NAME for backwards compatibility
+MODEL_NAME = PRIMARY_MODEL
 
 # System prompts for different assistant types
 # These are the ORIGINAL instructions from the OpenAI Assistants that were previously configured
@@ -98,7 +106,21 @@ Format all responses in Markdown. Do not use LaTeX formatting for math, use Mark
 
 
 def chat_with_history(messages: list[dict], model: str = MODEL_NAME, response_format=None) -> str:
-    """Make a chat completion request with conversation history."""
+    """Make a chat completion request with conversation history.
+
+    Implements graceful error handling and automatic fallback to cheaper model on quota errors.
+
+    Args:
+        messages: List of message dictionaries with role and content
+        model: Model to use (defaults to PRIMARY_MODEL)
+        response_format: Optional response format specification
+
+    Returns:
+        Response content string
+
+    Raises:
+        Exception: Re-raises non-recoverable errors with user-friendly messages
+    """
     client = OpenAI(api_key=OPENAI_API_KEY)
 
     kwargs = {
@@ -109,8 +131,63 @@ def chat_with_history(messages: list[dict], model: str = MODEL_NAME, response_fo
     if response_format:
         kwargs["response_format"] = response_format
 
-    response = client.chat.completions.create(**kwargs)
-    return response.choices[0].message.content
+    try:
+        response = client.chat.completions.create(**kwargs)
+        return response.choices[0].message.content
+
+    except RateLimitError as e:
+        # Handle quota exceeded (429) or rate limit errors
+        error_message = str(e)
+        logger.error(f"Rate limit or quota error with model {model}: {error_message}")
+
+        # If we're already using the fallback model, don't retry
+        if model == FALLBACK_MODEL:
+            raise Exception(
+                "I'm having trouble accessing OpenAI right now. "
+                "This might be a quota or rate limit issue. Please try again in a few moments, "
+                "or contact your administrator to check your OpenAI API quota and billing."
+            ) from e
+
+        # Try with fallback model
+        logger.info(f"Retrying with fallback model: {FALLBACK_MODEL}")
+        try:
+            kwargs["model"] = FALLBACK_MODEL
+            response = client.chat.completions.create(**kwargs)
+            return response.choices[0].message.content
+        except Exception as fallback_error:
+            logger.error(f"Fallback also failed: {fallback_error}")
+            raise Exception(
+                "I'm experiencing difficulties with OpenAI services. "
+                "Please check your API quota and billing at https://platform.openai.com/account/billing"
+            ) from fallback_error
+
+    except APIConnectionError as e:
+        logger.error(f"Connection error: {e}")
+        raise Exception(
+            "I couldn't connect to OpenAI. Please check your internet connection and try again."
+        ) from e
+
+    except APIError as e:
+        logger.error(f"API error: {e}")
+        error_msg = str(e)
+
+        # Check for specific error types
+        if "insufficient_quota" in error_msg or "quota" in error_msg.lower():
+            raise Exception(
+                "OpenAI API quota has been exceeded. "
+                "Please check your billing and usage at https://platform.openai.com/account/billing"
+            ) from e
+        elif "invalid" in error_msg.lower() and "model" in error_msg.lower():
+            raise Exception(
+                f"The model '{model}' is not available or invalid. "
+                f"Please check your OpenAI API access and model permissions."
+            ) from e
+        else:
+            raise Exception(f"OpenAI API error: {error_msg}") from e
+
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        raise Exception(f"An unexpected error occurred: {str(e)}") from e
 
 
 def chat_generate_question(subject: str, memo: str):
