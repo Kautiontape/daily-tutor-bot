@@ -44,6 +44,7 @@ from src.strings import (
     BOT_MENU_QUESTION_DESCRIPTION,
     BOT_MENU_SOLVE_DESCRIPTION,
     BOT_MENU_SUBJECT_DESCRIPTION,
+    BOT_MENU_VERSION_DESCRIPTION,
     BOT_NAME,
     BOT_SHORT_DESCRIPTION,
     CHECKING_SOLUTION_MESSAGE,
@@ -62,7 +63,7 @@ from src.strings import (
     SUBMIT_SOLUTION_PROMPT_MESSAGE,
     TUTOR_ERROR_MESSAGE,
 )
-from src.utils import error_handler, get_db_context, send_typing
+from src.utils import error_handler, get_db_context, get_git_commit_hash, send_typing
 
 # Load environment variables
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -109,6 +110,13 @@ async def start(update: Update, context: CallbackContext) -> None:
     # Get the first name from telegram
     user_first_name = update.message.from_user.first_name
     await update.message.reply_text(START_MESSAGE.format(user_first_name=user_first_name))
+
+
+# Command: /version
+# noinspection PyUnusedLocal
+async def version(update: Update, context: CallbackContext) -> None:
+    commit_hash = get_git_commit_hash()
+    await update.message.reply_text(f"Daily Tutor Bot\nVersion: {commit_hash}")
 
 
 # Handle /subject command
@@ -417,6 +425,7 @@ async def post_init(application: Application) -> None:
         BotCommand(command="solve", description=BOT_MENU_SOLVE_DESCRIPTION),
         BotCommand(command="giveup", description=BOT_MENU_GIVE_UP_DESCRIPTION),
         BotCommand(command="freetalk", description=BOT_MENU_PLAY_DESCRIPTION),
+        BotCommand(command="version", description=BOT_MENU_VERSION_DESCRIPTION),
     ]
 
     # noinspection PyUnresolvedReferences
@@ -436,6 +445,7 @@ def create_bot() -> Application:
 
     # Handlers
     application.add_handler(CommandHandler("start", start, block=False))
+    application.add_handler(CommandHandler("version", version, block=False))
     application.add_handler(CommandHandler("subject", handle_subject, block=False))
     application.add_handler(CommandHandler("memo", handle_memo, block=False))
     application.add_handler(CommandHandler("hint", handle_hint, block=False))
@@ -507,6 +517,7 @@ def main_with_extras() -> None:
     # Define bot properties (run async task synchronously)
     try:
         import nest_asyncio
+
         nest_asyncio.apply()
     except ImportError:
         pass

@@ -1,4 +1,5 @@
 import logging
+import subprocess
 
 from sqlalchemy.orm import Session
 from telegram import Update
@@ -19,7 +20,17 @@ def get_db_context() -> Session:
     return next(get_db())
 
 
-#
 async def send_typing(update: Update, context: CallbackContext) -> None:
     # Send that the bot is typing so the user knows to wait
     await context.bot.send_chat_action(chat_id=update.effective_message.chat_id, action=ChatAction.TYPING)
+
+
+def get_git_commit_hash() -> str:
+    """Get the current git commit hash."""
+    try:
+        commit_hash = subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.STDOUT, text=True).strip()
+        return commit_hash
+    except subprocess.CalledProcessError:
+        return "Unknown (not a git repository or git not available)"
+    except Exception as e:
+        return f"Unknown (error: {str(e)})"

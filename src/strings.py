@@ -26,6 +26,8 @@ BOT_MENU_GIVE_UP_DESCRIPTION = "Give up and submit your solution to the latest q
 
 BOT_MENU_PLAY_DESCRIPTION = "Chat with me about anything regarding your subject! No question needed."
 
+BOT_MENU_VERSION_DESCRIPTION = "Check the current bot version (git commit hash)."
+
 START_MESSAGE = (
     "Hey {user_first_name}! We're excited to have you here. To get started, please set your subject using /subject followed by the topic you're interested in. "
     "Once you've set your subject, I will prepare a question for you. You'll receive a new question tomorrow, but if you're eager to start, you can try a question right away using /question."
