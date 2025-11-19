@@ -8,6 +8,7 @@ import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from telegram import BotCommand, Update
 from telegram.constants import ChatAction
+from telegram.error import Conflict
 from telegram.ext import Application, CallbackContext, CommandHandler, ContextTypes, MessageHandler, filters
 
 from src.db import (
@@ -400,6 +401,14 @@ async def handle_send_daily_question(update: Update, context: CallbackContext) -
 
 # Error handler
 async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Handle duplicate bot instance conflicts gracefully
+    if isinstance(context.error, Conflict):
+        error_message = str(context.error)
+        if "terminated by other getUpdates request" in error_message:
+            # Just log it, don't notify developer or reply to user
+            logger.info(f"Duplicate bot instance detected (expected): {error_message}")
+            return
+
     tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
     tb_string = "".join(tb_list)
 
@@ -412,7 +421,8 @@ async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> No
     )
 
     # noinspection PyUnresolvedReferences
-    await update.message.reply_text(TUTOR_ERROR_MESSAGE)
+    if update and hasattr(update, "message") and update.message:
+        await update.message.reply_text(TUTOR_ERROR_MESSAGE)
 
 
 async def post_init(application: Application) -> None:
