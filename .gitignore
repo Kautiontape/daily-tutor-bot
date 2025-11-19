@@ -1,5 +1,8 @@
 db/*.db
 
+# Version file (generated during deployment)
+VERSION
+
 # SSH keys (for deployment)
 *_deploy_key
 *_deploy_key.pub
