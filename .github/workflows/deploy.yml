@@ -33,6 +33,10 @@ jobs:
             echo "📌 Current commit:"
             git log -1 --oneline
 
+            # Create VERSION file with commit hash
+            echo "📝 Creating VERSION file..."
+            git rev-parse HEAD > VERSION
+
             # Stop containers
             echo "🛑 Stopping containers..."
             docker-compose down
