@@ -18,9 +18,54 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
           script: |
+            set -e
             cd ${{ secrets.DEPLOY_PATH }}
+
+            echo "========================================="
+            echo "Starting Deployment"
+            echo "========================================="
+
+            # Pull latest code
+            echo "📥 Pulling latest changes..."
             git pull origin main
+
+            # Show current commit
+            echo "📌 Current commit:"
+            git log -1 --oneline
+
+            # Stop containers
+            echo "🛑 Stopping containers..."
             docker-compose down
+
+            # Build new images
+            echo "🔨 Building images..."
             docker-compose build --no-cache
+
+            # Start containers
+            echo "🚀 Starting containers..."
             docker-compose up -d
-            echo "Deployment completed successfully!"
+
+            # Wait for containers to stabilize
+            echo "⏳ Waiting for containers to start..."
+            sleep 10
+
+            # Verify containers are running
+            echo "📊 Container status:"
+            docker-compose ps
+
+            # Check if app container is running
+            if docker-compose ps | grep -q "daily_user_bot_app.*Up"; then
+              echo "✅ App container is running"
+            else
+              echo "❌ App container failed to start"
+              docker-compose logs --tail=50 app
+              exit 1
+            fi
+
+            # Show recent logs
+            echo "📋 Recent app logs:"
+            docker-compose logs --tail=20 app
+
+            echo "========================================="
+            echo "✅ Deployment completed successfully!"
+            echo "========================================="

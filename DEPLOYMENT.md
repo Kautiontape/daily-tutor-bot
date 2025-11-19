@@ -17,31 +17,44 @@ This guide will help you set up automated deployment so that pushes to the `main
 
 ## Setup Instructions
 
-### Step 1: Generate SSH Key (if you don't have one)
+### Step 1: Verify User Has Shell Access
 
-On your **local machine** or in a secure location:
+On your **server**, check if the SSH user has shell access:
 
 ```bash
-ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/github_deploy_key
+# Check current user's shell
+grep "^$USER:" /etc/passwd
+
+# The line should end with /bin/bash, NOT /usr/sbin/nologin or /bin/false
 ```
 
-This creates two files:
-- `~/.ssh/github_deploy_key` (private key - keep secret!)
-- `~/.ssh/github_deploy_key.pub` (public key)
-
-### Step 2: Add Public Key to Your Server
-
-Copy the public key to your server:
+If it shows `/usr/sbin/nologin` or `/bin/false`, enable shell access:
 
 ```bash
-ssh-copy-id -i ~/.ssh/github_deploy_key.pub your-username@your-server-ip
+# Enable bash shell for your user (requires sudo)
+sudo usermod -s /bin/bash your-username
+
+# Or use a different user that already has shell access
+grep "/bin/bash" /etc/passwd
 ```
 
-Or manually add it to `~/.ssh/authorized_keys` on your server:
+### Step 2: Generate SSH Key on Server
+
+On your **server** (this is simpler than generating locally):
 
 ```bash
-cat ~/.ssh/github_deploy_key.pub >> ~/.ssh/authorized_keys
+# Generate key pair
+ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/github_deploy_key -N ""
+
+# Add public key to authorized_keys
+cat ~/github_deploy_key.pub >> ~/.ssh/authorized_keys
 chmod 600 ~/.ssh/authorized_keys
+
+# Display the private key to copy to GitHub
+cat ~/github_deploy_key
+
+# After copying to GitHub, remove the key files for security
+rm ~/github_deploy_key ~/github_deploy_key.pub
 ```
 
 ### Step 3: Configure GitHub Secrets
@@ -131,6 +144,26 @@ docker-compose up -d
 
 ## Monitoring
 
+### Verify New Version is Running
+
+After deployment, verify the new code is active:
+
+```bash
+# On your server, check the current git commit
+cd /path/to/daily-tutor-bot
+git log -1 --oneline
+
+# Compare with what's on GitHub main branch
+# They should match after deployment
+
+# Check when containers were created
+docker-compose ps
+# Look at the "Created" column - should be recent
+
+# Verify containers are running
+docker-compose ps | grep "Up"
+```
+
 ### Check if deployment succeeded:
 ```bash
 docker-compose ps
@@ -146,7 +179,34 @@ docker-compose logs -f app
 docker-compose logs --tail=50 app
 ```
 
+### Check specific commit is deployed:
+```bash
+# On server
+cd /path/to/daily-tutor-bot
+git rev-parse HEAD  # Get current commit hash
+
+# Compare with GitHub
+# https://github.com/shawnsquire/daily-tutor-bot/commits/main
+```
+
 ## Troubleshooting
+
+### "This account is currently not available"
+This means the SSH user doesn't have shell access enabled.
+
+**Fix:**
+```bash
+# On your server, check the user's shell
+grep "^$USER:" /etc/passwd
+
+# If it shows /usr/sbin/nologin or /bin/false, enable bash:
+sudo usermod -s /bin/bash your-username
+
+# Verify the change
+grep "^$USER:" /etc/passwd  # Should now show /bin/bash
+```
+
+After fixing, update the `SSH_USER` secret in GitHub if you changed to a different user.
 
 ### Deployment fails with "Permission denied"
 - Make sure the public key is in `~/.ssh/authorized_keys` on the server
