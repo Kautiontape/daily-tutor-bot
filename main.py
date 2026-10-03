@@ -524,6 +524,11 @@ def main_with_extras() -> None:
     # Create the bot application
     application = create_bot()
 
+    # Python 3.14's get_event_loop() no longer creates one. Make the loop that
+    # the scheduler binds to and run_polling() later picks up.
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
     # Define bot properties (run async task synchronously)
     try:
         import nest_asyncio
@@ -533,14 +538,14 @@ def main_with_extras() -> None:
         pass
 
     try:
-        asyncio.get_event_loop().run_until_complete(define_bot(application))
+        loop.run_until_complete(define_bot(application))
         logger.info("Bot properties defined")
     except Exception as e:
         logger.error(f"Failed to define bot: {e}")
 
     # Start the scheduler
     try:
-        asyncio.get_event_loop().run_until_complete(run_scheduler(application))
+        loop.run_until_complete(run_scheduler(application))
         logger.info("Scheduler started")
     except Exception as e:
         logger.error(f"Failed to start scheduler: {e}")
