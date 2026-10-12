@@ -1,41 +1,29 @@
 services:
   postgres:
-    image: postgres:18-alpine
+    image: postgres:15-alpine
     container_name: daily_tutor_bot_db
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
     volumes:
-      - daily_tutor_bot_postgres_data:/var/lib/postgresql/data
-    ports:
-      - "${DB_PORT}:5432"
-    restart: always
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
 
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: daily_user_bot_app
-    volumes:
-      - .:/usr/src/app
-    working_dir: /usr/src/app
+    container_name: daily_tutor_bot_app
     depends_on:
       - postgres
+    env_file: .env
     environment:
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
       DB_HOST: postgres
       DB_PORT: 5432
-      STATUS_SERVER_PORT: ${STATUS_SERVER_PORT}
-      DEVELOPER_CHAT_ID: ${DEVELOPER_CHAT_ID}
     ports:
-      - "${STATUS_SERVER_PORT}:8080"
-    restart: always
+      - "127.0.0.1:8200:8080"
+    restart: unless-stopped
 
 volumes:
-  daily_tutor_bot_postgres_data:
-    external: true
+  pgdata:

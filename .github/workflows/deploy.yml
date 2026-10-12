@@ -7,7 +7,15 @@ on:
 jobs:
   deploy:
     runs-on: [self-hosted, ktn]
+    permissions:
+      contents: read
+      packages: read
     steps:
+      # The build pulls ghcr.io/astral-sh/uv. Other ktn deploys leave their
+      # job token in the runner's Docker config, and it is revoked when their
+      # job ends, so log in fresh or ghcr answers "denied".
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
       - name: Deploy
         run: |
           cd /opt/services/daily-tutor-bot
